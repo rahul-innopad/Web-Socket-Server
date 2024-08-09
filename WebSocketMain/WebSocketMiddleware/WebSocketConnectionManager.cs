@@ -7,16 +7,17 @@ namespace WebSocketMain.WebSocketMiddleware
     {
         private readonly ConcurrentDictionary<Guid, WebSocket> _sockets = new ConcurrentDictionary<Guid, WebSocket>();
 
-        public Guid AddSocket(WebSocket socket)
+        public Guid AddSocket(WebSocket socket,string socketId)
         {
-            var socketId = Guid.NewGuid();
-            _sockets.TryAdd(socketId, socket);
-            return socketId;
+            var id = Guid.Parse(socketId);
+            _sockets.TryAdd(id, socket);
+            return id;
         }
 
-        public WebSocket? GetSocket(Guid socketId)
+        public WebSocket? GetSocket(string socketId)
         {
-            _sockets.TryGetValue(socketId, out var socket);
+            var socketIdInString = Guid.Parse(socketId);
+            _sockets.TryGetValue(socketIdInString, out var socket);
             return socket;
         }
 

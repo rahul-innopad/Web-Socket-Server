@@ -17,10 +17,10 @@ namespace WebSocketMain.WebSocketMiddleware
 
         public async Task HandleWebSocketAsync(WebSocket webSocket,HttpContext context)
         {
-            var socketId = context.Request.Query["name"];
+            var connectionId = context.Request.Query["id"];
             var stringBuilder = new StringBuilder();
-            _connectionManager.AddSocket(webSocket);
-            await BroadcastMessageAsync($"{socketId} is connected");
+            _connectionManager.AddSocket(webSocket, connectionId);
+            await BroadcastMessageAsync($"{connectionId} is connected");
             try
             {
                 while (webSocket.State == WebSocketState.Open)
@@ -31,12 +31,31 @@ namespace WebSocketMain.WebSocketMiddleware
                     if (result.MessageType == WebSocketMessageType.Text)
                     {
                         var message = Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
-                        if (!string.IsNullOrEmpty(message))
+                        var messageParts = message.Split(':', 3);
+                        if (messageParts.Length  == 3)
                         {
-                            _logger.LogInformation($"Received message from ID {socketId}: {message}");
-                            await BroadcastMessageAsync($"{socketId} : {message}");
-                            stringBuilder.Clear();
+                            var recipientId = messageParts[0].ToString();
+                            var receiverId = messageParts[1];
+                            if (!string.IsNullOrEmpty(message))
+                            {
+                                var getRecepientSocketId= _connectionManager.GetSocket(recipientId);
+                                if (getRecepientSocketId!= null && getRecepientSocketId.State == WebSocketState.Open)
+                                {
+                                    _logger.LogInformation($"Received message from ID {connectionId}: {messageParts[2]}");
+                                    await getRecepientSocketId.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(messageParts[2].ToString())), result.MessageType, result.EndOfMessage, CancellationToken.None);
+                                    
+                                    stringBuilder.Clear();
+                                }
+                                else
+                                {
+                                    _logger.LogInformation($"Received message from ID {connectionId}: {messageParts[2]}");
+                                    await getRecepientSocketId.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(messageParts[2].ToString())), result.MessageType, result.EndOfMessage, CancellationToken.None);
+                                    await BroadcastMessageAsync($"{receiverId} : offline");
+                                }
+                                
+                            }
                         }
+                        
 
                     }
                     else if (result.MessageType == WebSocketMessageType.Close)
